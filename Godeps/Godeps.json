@@ -1,0 +1,19 @@
+{
+	"ImportPath": "github.com/andrew-d/docker-hosts",
+	"GoVersion": "go1.3.3",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/fsouza/go-dockerclient",
+			"Comment": "0.2.1-185-g4fc0e0d",
+			"Rev": "4fc0e0dbba85f2f799aa77cea594d40267f5bd5a"
+		},
+		{
+			"ImportPath": "github.com/jessevdk/go-flags",
+			"Comment": "v1-202-g4f0ca1e",
+			"Rev": "4f0ca1e2d1349e9662b633ea1b8b8d48e8a32533"
+		}
+	]
+}
