@@ -1,11 +1,12 @@
 package main
 
 import (
-	dockerapi "github.com/fsouza/go-dockerclient"
-	"log"
 	"os"
 	"strings"
 	"sync"
+
+	log "github.com/Sirupsen/logrus"
+	dockerapi "github.com/fsouza/go-dockerclient"
 )
 
 type HostEntry struct {
@@ -57,7 +58,10 @@ func (h *Hosts) WriteFile() {
 	file, err := os.Create(h.path)
 
 	if err != nil {
-		log.Println("unable to write to", h.path, err)
+		log.WithFields(log.Fields{
+			"path": h.path,
+			"err":  err,
+		}).Error("unable to write hosts file")
 		return
 	}
 
@@ -81,7 +85,10 @@ func (h *Hosts) Add(containerId string) {
 
 	container, err := h.docker.InspectContainer(containerId)
 	if err != nil {
-		log.Println("unable to inspect container:", containerId, err)
+		log.WithFields(log.Fields{
+			"containerId": containerId,
+			"err":         err,
+		}).Error("unable to inspect container:")
 		return
 	}
 

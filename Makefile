@@ -16,4 +16,4 @@ docker: build
 	docker push andrewd/$(NAME)
 
 clean:
-	rm -rf build
+	rm -rf $(NAME)

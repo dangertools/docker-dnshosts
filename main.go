@@ -1,9 +1,9 @@
 package main
 
 import (
-	"log"
 	"os"
 
+	log "github.com/Sirupsen/logrus"
 	dockerapi "github.com/fsouza/go-dockerclient"
 	flags "github.com/jessevdk/go-flags"
 )
@@ -14,12 +14,6 @@ func getopt(name, def string) string {
 	}
 
 	return def
-}
-
-func assert(err error) {
-	if err != nil {
-		log.Fatal("docker-hosts: ", err)
-	}
 }
 
 type Options struct {
@@ -38,32 +32,42 @@ func main() {
 	}
 
 	docker, err := dockerapi.NewClient(getopt("DOCKER_HOST", "unix:///var/run/docker.sock"))
-	assert(err)
+	if err != nil {
+		log.WithField("err", err).Fatal("could not connect to docker")
+	}
 
 	hosts := NewHosts(docker, opts.File.Filename, opts.DomainName)
 
 	// set up to handle events early, so we don't miss anything while doing the
 	// initial population
 	events := make(chan *dockerapi.APIEvents)
-	assert(docker.AddEventListener(events))
+	err = docker.AddEventListener(events)
+	if err != nil {
+		log.WithField("err", err).Fatal("could not add event listener")
+	}
 
 	containers, err := docker.ListContainers(dockerapi.ListContainersOptions{})
-	assert(err)
+	if err != nil {
+		log.WithField("err", err).Fatal("could not list containers")
+	}
 
 	for _, listing := range containers {
+		log.WithField("id", listing.ID).Debug("adding existing container")
 		go hosts.Add(listing.ID)
 	}
 
-	log.Println("docker-hosts: Listening for Docker events...")
+	log.Infoln("listening for Docker events...")
 	for msg := range events {
 		switch msg.Status {
 		case "start":
+			log.WithField("id", msg.ID).Debug("adding new container")
 			go hosts.Add(msg.ID)
 
 		case "die":
+			log.WithField("id", msg.ID).Debug("removing dead container")
 			go hosts.Remove(msg.ID)
 		}
 	}
 
-	log.Fatal("docker-hosts: docker event loop closed") // todo: reconnect?
+	log.Fatal("docker event loop closed") // todo: reconnect?
 }
