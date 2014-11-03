@@ -18,6 +18,7 @@ func getopt(name, def string) string {
 
 type Options struct {
 	DomainName string `short:"d" long:"domain-name" description:"domain to append"`
+	Verbose    bool   `short:"v" long:"verbose" description:"be more verbose"`
 	File       struct {
 		Filename string
 	} `positional-args:"true" required:"true" description:"the hosts file to write"`
@@ -29,6 +30,10 @@ func main() {
 	_, err := flags.Parse(&opts)
 	if err != nil {
 		os.Exit(1)
+	}
+
+	if opts.Verbose {
+		log.SetLevel(log.DebugLevel)
 	}
 
 	docker, err := dockerapi.NewClient(getopt("DOCKER_HOST", "unix:///var/run/docker.sock"))
