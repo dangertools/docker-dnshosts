@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	dockerapi "github.com/fsouza/go-dockerclient"
@@ -21,6 +23,7 @@ type Hosts struct {
 	path    string
 	domain  string
 	entries map[string]HostEntry
+	builtin map[string]HostEntry
 }
 
 func NewHosts(docker *dockerapi.Client, path, domain string) *Hosts {
@@ -31,25 +34,26 @@ func NewHosts(docker *dockerapi.Client, path, domain string) *Hosts {
 	}
 
 	hosts.entries = make(map[string]HostEntry)
+	hosts.builtin = make(map[string]HostEntry)
 
 	// combination of docker, centos
-	hosts.entries["__localhost4"] = HostEntry{
+	hosts.builtin["__localhost4"] = HostEntry{
 		IPAddress:         "127.0.0.1",
 		CanonicalHostname: "localhost",
 		Aliases:           []string{"localhost4"},
 	}
 
-	hosts.entries["__localhost6"] = HostEntry{
+	hosts.builtin["__localhost6"] = HostEntry{
 		IPAddress:         "::1",
 		CanonicalHostname: "localhost",
 		Aliases:           []string{"localhost6", "ip6-localhost", "ip6-loopback"},
 	}
 
 	// docker puts these in
-	hosts.entries["fe00::0"] = HostEntry{"fe00::0", "ip6-localnet", nil}
-	hosts.entries["ff00::0"] = HostEntry{"ff00::0", "ip6-mcastprefix", nil}
-	hosts.entries["ff02::1"] = HostEntry{"ff02::1", "ip6-allnodes", nil}
-	hosts.entries["ff02::2"] = HostEntry{"ff02::2", "ip6-allrouters", nil}
+	hosts.builtin["fe00::0"] = HostEntry{"fe00::0", "ip6-localnet", nil}
+	hosts.builtin["ff00::0"] = HostEntry{"ff00::0", "ip6-mcastprefix", nil}
+	hosts.builtin["ff02::1"] = HostEntry{"ff02::1", "ip6-allnodes", nil}
+	hosts.builtin["ff02::2"] = HostEntry{"ff02::2", "ip6-allrouters", nil}
 
 	return hosts
 }
@@ -67,7 +71,33 @@ func (h *Hosts) WriteFile() {
 
 	defer file.Close()
 
+	// Write the current time
+	currTime := time.Now().UTC().Truncate(time.Millisecond)
+	headerText := fmt.Sprintf(`
+# Hosts file created by docker-hosts
+# Number of entries: %d
+# Last updated at: %s
+
+
+# Running containers
+`, len(h.entries), currTime)
+
+	file.WriteString(strings.TrimLeft(headerText, "\r\n "))
+
 	for _, entry := range h.entries {
+		// <ip>\t<canonical>\t<alias1>\t…\t<aliasN>\n
+		file.WriteString(strings.Join(
+			append(
+				[]string{entry.IPAddress, entry.CanonicalHostname},
+				entry.Aliases...,
+			),
+			"\t",
+		) + "\n")
+	}
+
+	file.WriteString("\n# Built-in entries\n")
+
+	for _, entry := range h.builtin {
 		// <ip>\t<canonical>\t<alias1>\t…\t<aliasN>\n
 		file.WriteString(strings.Join(
 			append(
