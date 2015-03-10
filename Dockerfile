@@ -1,7 +1,7 @@
-FROM blalor/centos:latest
-MAINTAINER Brian Lalor <blalor@bravo5.org>
+FROM gliderlabs/alpine:3.1
+MAINTAINER Andrew Dunham <andrew@du.nham.ca>
 
-ADD release/docker-hosts /usr/local/bin/
+ADD docker-hosts /usr/local/bin/
 
 ## should *not* run as root, but needs access to /var/run/docker.sock, which
 ## should *not* be accessible by nobody. *sigh*

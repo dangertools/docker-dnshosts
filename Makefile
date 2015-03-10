@@ -9,7 +9,8 @@ all: build
 build: $(NAME)
 
 $(NAME): $(SOURCES)
-	godep go build -v -o $@ ./...
+	CGO_ENABLED=0 godep go build -a -v -tags netgo -installsuffix netgo -o $@ ./...
+	strip $@
 
 docker: build
 	docker build --tag=andrewd/$(NAME) .
