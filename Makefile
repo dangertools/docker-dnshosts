@@ -1,4 +1,4 @@
-NAME=docker-hosts
+NAME=docker-dnshosts
 
 SOURCES=main.go hosts.go
 

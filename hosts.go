@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"os/exec"
 
 	log "github.com/Sirupsen/logrus"
 	dockerapi "github.com/fsouza/go-dockerclient"
@@ -33,27 +34,7 @@ func NewHosts(docker *dockerapi.Client, path, domain string) *Hosts {
 		domain: domain,
 	}
 
-	hosts.entries = make(map[string]HostEntry)
-	hosts.builtin = make(map[string]HostEntry)
-
-	// combination of docker, centos
-	hosts.builtin["__localhost4"] = HostEntry{
-		IPAddress:         "127.0.0.1",
-		CanonicalHostname: "localhost",
-		Aliases:           []string{"localhost4"},
-	}
-
-	hosts.builtin["__localhost6"] = HostEntry{
-		IPAddress:         "::1",
-		CanonicalHostname: "localhost",
-		Aliases:           []string{"localhost6", "ip6-localhost", "ip6-loopback"},
-	}
-
-	// docker puts these in
-	hosts.builtin["fe00::0"] = HostEntry{"fe00::0", "ip6-localnet", nil}
-	hosts.builtin["ff00::0"] = HostEntry{"ff00::0", "ip6-mcastprefix", nil}
-	hosts.builtin["ff02::1"] = HostEntry{"ff02::1", "ip6-allnodes", nil}
-	hosts.builtin["ff02::2"] = HostEntry{"ff02::2", "ip6-allrouters", nil}
+	FullUpdate(hosts)
 
 	return hosts
 }
@@ -74,7 +55,7 @@ func (h *Hosts) WriteFile() {
 	// Write the current time
 	currTime := time.Now().UTC().Truncate(time.Millisecond)
 	headerText := fmt.Sprintf(`
-# Hosts file created by docker-hosts
+# Hosts file created by docker-dnshosts
 # Number of entries: %d
 # Last updated at: %s
 
@@ -109,10 +90,12 @@ func (h *Hosts) WriteFile() {
 	}
 }
 
-func (h *Hosts) Add(containerId string) {
-	h.Lock()
-	defer h.Unlock()
+func (h *Hosts) ReloadConfiguration() {
+    cmd := exec.Command("pkill", "-x", "-HUP", "dnsmasq")
+    cmd.Run()
+}
 
+func AddContainerEntry(h *Hosts, containerId string) {
 	container, err := h.docker.InspectContainer(containerId)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -136,8 +119,16 @@ func (h *Hosts) Add(containerId string) {
 	}
 
 	h.entries[containerId] = entry
+}
+
+func (h *Hosts) Add(containerId string) {
+	h.Lock()
+	defer h.Unlock()
+
+	AddContainerEntry(h, containerId)
 
 	h.WriteFile()
+	h.ReloadConfiguration()
 }
 
 func (h *Hosts) Remove(containerId string) {
@@ -147,4 +138,23 @@ func (h *Hosts) Remove(containerId string) {
 	delete(h.entries, containerId)
 
 	h.WriteFile()
+	h.ReloadConfiguration()
+}
+
+func FullUpdate(h *Hosts) {
+    h.Lock()
+    defer h.Unlock()
+    
+    containers, err := h.docker.ListContainers(dockerapi.ListContainersOptions{})
+    if err != nil {
+        log.Println("unable to list containers:", err)
+        return
+    }
+    h.entries = make(map[string]HostEntry)
+
+    for _, container := range containers {
+	AddContainerEntry(h, container.ID)
+    }
+    h.WriteFile()
+    h.ReloadConfiguration()
 }

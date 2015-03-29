@@ -1,42 +1,29 @@
 # Simplified Docker container hostname resolution
 
-`docker-hosts` (yes, a terrible name) maintains a file in the format of
-`/etc/hosts` that contains IP addresses and hostnames of Docker containers. When
-the generated file is mounted at `/etc/hosts` within your Docker container it
-provides simple hostname resolution.  This allows you to set up `redis` and
-`web` containers where the `web` container is able to connect to `redis` via its
-hostname.  You can optionally provide a domain like `dev.docker`, so
-`redis.dev.docker` is a usable alias, as well.
+`docker-dnshosts` (a fork of docker-hosts with a still terrible name) maintains a file in the format of
+`/etc/hosts` that contains IP addresses and hostnames of Docker containers.
+Contrary to the original solution in docker-hosts, mounting a file is not the way
+to go with docker-dnshosts (although the same file is generated). The idea behind docker-dnshosts
+is to feed dnsmasq with the hosts information. 
+This way hostname resolution works as expected (if the containers are provided with a dnsmasq dns
+server) without loosing the features given by docker to the /etc/hosts file.
 
-This utility was inspired by Michael Crosby's
-[skydock](https://github.com/crosbymichael/skydock) project.  `docker-hosts` and
-skydock (paired with skydns) work in much the same way: the container lifecycle
-is monitored via the Docker daemon's events, and resolvable hostnames are made
-available to appropriately-configured containers.  The end result is that you
-have a simple way of connecting containers together on the same Docker host,
-without having to resort to links or manual configuration.  This does *not*
-provide a solution to container connectivity across Docker hosts.  For that you
-should look at something like Jeff Lindsay's
-[registrator](https://github.com/progrium/registrator).
+The solution was inspired by [Amartynov's dnsmasq and docker solution](https://blog.amartynov.ru/archives/dnsmasq-docker-service-discovery/),
+yet I didn't like the fact to always manually call a script after changing containers. This solution
+builds on the same principle but reacts to docker events and HUPs dnsmasq automatically after finding a change.
+
 
 ## building
 
-This project uses [gpm][gpm] and [gvp][gvp].  Both must be available on your
+This project uses [godep][godep]. Godep must be available on your
 path.
 
     make
 
--- or --
-
-    gvp init
-    source gvp in
-    gpm install
-    go build -v -o stage/docker-host ./...
-
 ## running
 
-Start the `docker-host` process and give it the path to a file that will be
-mounted as `/etc/hosts` in your containers:
+Start the `docker-dnshosts` process and give it the path to the container hosts file,
+which is bound to dnsmasq:
 
     docker-host /path/to/hosts
 
@@ -44,15 +31,10 @@ Optionally specify `DOCKER_HOST` environment variable.
 
 Then start a container:
 
-    docker run -i -t -v /path/to/hosts:/etc/hosts:ro centos /bin/bash
+    docker run -i -t --dns=your.dns.server centos /bin/bash
 
-Within the `centos` container, you'll see `/etc/hosts` has an entry for the
-container you just started, as well as any other containers already running.
-`/etc/hosts` will continue to reflect all of the containers currently running on
-this Docker host.
-
-The **only** container that should have write access to the generated hosts file
-is the container running this application.
+Within the `centos` container, you can just ping any other container running on the same
+docker host.
 
 ## running in Docker
 
@@ -62,8 +44,7 @@ by `nobody:nobody`.
     docker run \
         -d \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        -v /var/lib/docker/hosts:/srv/hosts \
-        blalor/docker-hosts --domain-name=dev.docker /srv/hosts
+        -v /path/to/hosts:/srv/hosts \
+        blalor/docker-dnshosts --domain-name=dev.docker /srv/hosts
 
-[gpm]: https://github.com/pote/gpm
-[gvp]: https://github.com/pote/gvp
+[godep]: https://github.com/tools/godep
