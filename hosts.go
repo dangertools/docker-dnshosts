@@ -91,8 +91,8 @@ func (h *Hosts) WriteFile() {
 }
 
 func (h *Hosts) ReloadConfiguration() {
-    cmd := exec.Command("pkill", "-x", "-HUP", "dnsmasq")
-    cmd.Run()
+	cmd := exec.Command("pkill", "-x", "-HUP", "dnsmasq")
+	cmd.Run()
 }
 
 func AddContainerEntry(h *Hosts, containerId string) {
@@ -142,19 +142,19 @@ func (h *Hosts) Remove(containerId string) {
 }
 
 func FullUpdate(h *Hosts) {
-    h.Lock()
-    defer h.Unlock()
-    
-    containers, err := h.docker.ListContainers(dockerapi.ListContainersOptions{})
-    if err != nil {
-        log.Println("unable to list containers:", err)
-        return
-    }
-    h.entries = make(map[string]HostEntry)
+	h.Lock()
+	defer h.Unlock()
+	
+	containers, err := h.docker.ListContainers(dockerapi.ListContainersOptions{})
+	if err != nil {
+		log.Println("unable to list containers:", err)
+		return
+	}
+	h.entries = make(map[string]HostEntry)
 
-    for _, container := range containers {
+	for _, container := range containers {
 	AddContainerEntry(h, container.ID)
-    }
-    h.WriteFile()
-    h.ReloadConfiguration()
+	}
+	h.WriteFile()
+	h.ReloadConfiguration()
 }
