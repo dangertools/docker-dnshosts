@@ -13,8 +13,8 @@ $(NAME): $(SOURCES)
 	strip $@
 
 docker: build
-	docker build --tag=andrewd/$(NAME) .
-	docker push andrewd/$(NAME)
+	docker build --tag=dangertools/$(NAME) .
+	docker push dangertools/$(NAME)
 
 clean:
 	rm -rf $(NAME)
